@@ -99,6 +99,15 @@ public:
         return m_value;
     }
 
+    template<typename U> requires(std::is_convertible_v<U&&, T>)
+    constexpr auto value_or(U&& value) const noexcept(std::is_nothrow_convertible_v<U&&, T>) -> T {
+        if (m_has_value) {
+            return m_value;
+        }
+
+        return std::forward<U>(value);
+    }
+
     constexpr explicit operator bool() const noexcept  {
         return m_has_value;
     }
@@ -107,41 +116,59 @@ public:
         return m_has_value;
     }
 
-    template<typename F> requires(requires(F function) {
-        std::invocable<F, T&>;
-    } && typing::is_specialisation_v<std::invoke_result_t<F, T&>, option>)
-    constexpr auto and_then(F&& function) noexcept(noexcept(function(value()))) {
-        if (m_has_value) {
-            return std::invoke(std::forward<F>(function), value());
-        }
-
-        return std::remove_cvref_t<std::invoke_result_t<F, T&>>{};
-    }
-
-    template<typename F> requires(requires(F function) {
-        std::invocable<F>;
-        { function() } -> std::same_as<option<T>>;
-    })
-    constexpr auto or_else(F&& function)
-        noexcept(noexcept(std::is_nothrow_copy_constructible_v<option<T>>) && noexcept(function()))
+    template<typename F>
+    requires(std::invocable<F> && std::is_same_v<std::remove_cvref_t<std::invoke_result_t<F>>, option<T>>)
+    constexpr auto or_else(F&& function) const
+        noexcept(noexcept(std::is_nothrow_copy_constructible_v<option<T>>)
+                 && noexcept(std::invoke(std::forward<F>(function))))
         -> option<T> {
         if (m_has_value) {
             return *this;
         }
 
-        return std::forward<F>(function)();
+        return std::invoke(std::forward<F>(function));
     }
 
-    template<typename U, typename F> requires(requires(F function, T value) {
-        std::invocable<F, T>;
-        { function(value) } -> std::constructible_from<option<U>, decltype(function())>;
-    })
-    constexpr auto map() -> option<U> {
+    template<typename F>
+    requires(std::invocable<F, T&> && typing::is_specialisation_v<std::invoke_result_t<F, T&>, option>)
+    constexpr auto and_then(F&& function) noexcept(noexcept(std::invoke(std::forward<F>(function), m_value))) {
         if (m_has_value) {
-            return std::forward<F>()(value());
+            return std::invoke(std::forward<F>(function), m_value);
         }
 
-        return nullopt;
+        return std::remove_cvref_t<std::invoke_result_t<F, T&>>{};
+    }
+
+    template<typename F>
+    requires(std::invocable<F, T&> && typing::is_specialisation_v<std::invoke_result_t<F, T&>, option>)
+    constexpr auto and_then(F&& function) const noexcept(noexcept(std::invoke(std::forward<F>(function), m_value))) {
+        if (m_has_value) {
+            return std::invoke(std::forward<F>(function), m_value);
+        }
+
+        return std::remove_cvref_t<std::invoke_result_t<F, T&>>{};
+    }
+
+    template<typename F> requires(std::invocable<F, T&>)
+    constexpr auto map(F&& function) noexcept(noexcept(std::invoke(std::forward<F>(function), m_value))) {
+        using U = std::remove_cvref_t<std::invoke_result_t<F, T&>>;
+
+        if (m_has_value) {
+            return option<U>{std::invoke(std::forward<F>(function), m_value)};
+        }
+
+        return option<U>{};
+    }
+
+    template<typename F> requires(std::invocable<F, const T&>)
+    constexpr auto map(F&& function) const noexcept(noexcept(std::invoke(std::forward<F>(function), m_value))) {
+        using U = std::remove_cvref_t<std::invoke_result_t<F, const T&>>;
+
+        if (m_has_value) {
+            return option<U>{std::invoke(std::forward<F>(function), m_value)};
+        }
+
+        return option<U>{};
     }
 
     constexpr auto unwrap() noexcept(s_is_nothrow_move_constructible) -> T requires(s_is_move_constructible) {
@@ -152,10 +179,9 @@ public:
         return value;
     }
 
-    template<typename U>
+    template<typename U> requires(s_is_move_constructible && std::is_constructible_v<T, U>)
     constexpr auto unwrap_or(U&& value)
-        noexcept(s_is_nothrow_move_constructible && std::is_nothrow_constructible_v<T, U>)
-        -> T requires(s_is_move_constructible && std::is_constructible_v<T, U>) {
+        noexcept(s_is_nothrow_move_constructible && std::is_nothrow_constructible_v<T, U>) -> T {
         if (m_has_value) {
             return unwrap();
         }
@@ -163,17 +189,17 @@ public:
         return T{std::forward<U>(value)};
     }
 
-    template<typename F> requires(requires(F function) {
-        std::invocable<F>;
-        { function() } -> std::constructible_from<T, decltype(function())>;
-    })
+    template<typename F>
+    requires(std::invocable<F> && std::constructible_from<T, std::remove_cvref_t<std::invoke_result_t<F>>>)
     constexpr auto unwrap_or_else(F&& function)
-        noexcept(noexcept(function()) && std::is_nothrow_constructible_v<T, decltype(function())>) -> T {
+        noexcept(noexcept(std::invoke(std::forward<F>(function)))
+                 && std::is_nothrow_constructible_v<T, std::remove_cvref_t<std::invoke_result_t<F>>>)
+        -> T {
         if (m_has_value) {
             return unwrap();
         }
 
-        return std::forward<F>(function)();
+        return std::invoke(std::forward<F>(function));
     }
 
 private:

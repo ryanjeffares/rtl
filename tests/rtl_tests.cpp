@@ -33,16 +33,18 @@ struct S {
 
 int main() {
     // std::optional<S> s{{1}};
-    rtl::utilities::option<int> o = 100;
+    rtl::utilities::option<std::string> o = "hello";
     std::println("{}", o.has_value());
 
-    auto val = o.and_then([] (const int& i) {
+    auto o1 = o.value_or("goodbye");
+
+   /* auto val = o.and_then([] (const int& i) {
         return rtl::utilities::option<std::string>{std::to_string(i)};
     }).and_then([] (std::string_view sv) {
         return rtl::utilities::option<std::size_t>(sv.size());
-    }).unwrap_or(std::size_t{});
+    }).unwrap_or(std::size_t{});*/
 
-    std::println("{}", val);
+    // std::println("{}", val);
     /*rtl::collections::list<std::string> list;
 
     for (auto i = 10; i < 20; i++) {
