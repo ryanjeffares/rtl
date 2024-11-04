@@ -3,6 +3,8 @@ project(rtl-tests)
 
 include(CTest)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if (MSVC)
     set(RTL_OPTIONS /W4 /WX /std:c++latest)
 else ()

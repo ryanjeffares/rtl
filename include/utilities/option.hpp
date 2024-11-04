@@ -20,8 +20,11 @@
 #ifndef RTL_OPTION_HPP
 #define RTL_OPTION_HPP
 
-#include <compare>
+#include "assertions.hpp"
+#include "typing/concepts.hpp"
+
 #include <functional>
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -187,11 +190,11 @@ public:
     }
 
     constexpr auto operator->() const noexcept -> const T* {
-        return &value();
+        return std::addressof(value());
     }
 
     constexpr auto operator->() noexcept -> T* {
-        return &value();
+        return std::addressof(value());
     }
 
     constexpr auto operator*() const noexcept -> const T& {
@@ -203,10 +206,12 @@ public:
     }
 
     constexpr auto value() const noexcept -> const T& {
+        RTL_ASSERT(m_has_value, "Trying to access value in empty option");
         return m_value;
     }
 
     constexpr auto value() noexcept -> T& {
+        RTL_ASSERT(m_has_value, "Trying to access value in empty option");
         return m_value;
     }
 
@@ -283,6 +288,7 @@ public:
     }
 
     constexpr auto unwrap() noexcept(s_is_nothrow_move_constructible) -> T requires(s_is_move_constructible) {
+        RTL_ASSERT(m_has_value, "Trying to unwrap empty option");
         auto value = std::move(m_value);
         m_has_value = false;
         m_value.~T();

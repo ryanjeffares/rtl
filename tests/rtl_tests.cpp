@@ -31,22 +31,11 @@ struct S {
         std::println("Move assign");
         return *this;
     }
+
+    auto foo() const -> void {}
 };
 
 int main() {
-    rtl::collections::list<std::string> list;
-
-    for (auto i = 10; i < 20; i++) {
-        list.add(std::to_string(i));
-    }
-
-    const rtl::collections::list<std::string> l2;
-
-    for (std::size_t i = 0; i < 15; i++) {
-        auto el = list.at(i);
-
-        if (el) {
-            std::println("{}", el->get());
-        }
-    }
+    const utilities::option<S> o = 10;
+    o->foo();
 }

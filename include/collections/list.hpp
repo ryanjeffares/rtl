@@ -21,14 +21,15 @@
 #define RTL_LIST_HPP
 
 #include "typing/concepts.hpp"
+#include "utilities/assertions.hpp"
 #include "utilities/option.hpp"
 #include "utilities/reference.hpp"
 
 #include <algorithm>
 #include <concepts>
 #include <cstddef>
+#include <format>
 #include <memory>
-#include <optional>
 #include <type_traits>
 
 namespace rtl::collections {
@@ -71,10 +72,12 @@ public:
 
     // access
     constexpr auto operator[](size_type index) const noexcept -> const T& {
+        RTL_ASSERT(index < m_size, std::format("Index out of range: the index is {} but the size is {}", index, m_size));
         return m_array[index];
     }
 
     constexpr auto operator[](size_type index) noexcept -> T& {
+        RTL_ASSERT(index < m_size, std::format("Index out of range: the index is {} but the size is {}", index, m_size));
         return m_array[index];
     }
 
