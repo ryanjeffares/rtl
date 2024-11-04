@@ -22,6 +22,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <type_traits>
 
 namespace rtl::typing
 {
@@ -34,6 +35,12 @@ concept simple_allocator = requires(Allocator allocator, std::size_t n) {
 #else // #if __cplusplus <= 202302L
 // TODO: use C++26 allocator concept
 #endif // #if __cplusplus <= 202302L
+
+template<typename T, template<typename...> typename Template>
+inline constexpr bool is_specialisation_v = false;
+
+template<template<typename...> typename Template, typename... Ts>
+inline constexpr bool is_specialisation_v<Template<Ts...>, Template> = true;
 } // namespace rtl::typing
 
 #endif // #ifndef RTL_CONCEPTS_HPP

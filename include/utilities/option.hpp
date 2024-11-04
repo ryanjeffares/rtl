@@ -21,13 +21,14 @@
 #define RTL_OPTION_HPP
 
 #include <functional>
-#include <memory>
 #include <type_traits>
 
 namespace rtl::utilities {
 namespace detail {
 struct dummy {
-    dummy() noexcept = default;
+    constexpr dummy() noexcept {
+
+    }
 };
 } // namespace detail
 
@@ -47,19 +48,31 @@ private:
 
 public:
     constexpr option() noexcept
-        : m_has_value{false} {
-        m_data.dummy = detail::dummy{};
+        : m_dummy{}
+        , m_has_value{false} {
     }
 
     constexpr option(nullopt_t) noexcept
-        : m_has_value{false} {
-        m_data.dummy = detail::dummy{};
+        : m_dummy{}
+        , m_has_value{false} {
     }
 
     template<typename... Args>
     constexpr option(Args&&... args) noexcept(noexcept(std::is_nothrow_constructible_v<T, Args...>))
-        : m_has_value{true} {
-        std::construct_at(&m_data.value, std::forward<Args>(args)...);
+        : m_value{std::forward<Args>(args)...}
+        , m_has_value{true} {
+    }
+
+    template<typename U = T>
+    constexpr option(U&& value) noexcept(noexcept(std::is_nothrow_constructible_v<T, U>))
+        : m_value{std::forward<U>(value)}
+        , m_has_value{true} {
+    }
+
+    constexpr ~option() noexcept {
+        if (m_has_value) {
+            m_value.~T();
+        }
     }
 
     constexpr auto operator->() const noexcept -> const T* {
@@ -79,11 +92,11 @@ public:
     }
 
     constexpr auto value() const noexcept -> T& {
-        return m_data.value;
+        return m_value;
     }
 
     constexpr auto value() noexcept -> T& {
-        return m_data.value;
+        return m_value;
     }
 
     constexpr explicit operator bool() const noexcept  {
@@ -94,18 +107,19 @@ public:
         return m_has_value;
     }
 
-    template<typename U, typename F> requires(requires(F function, T value) {
-        { function(value) } -> std::constructible_from<option<U>, decltype(function())>;
-    })
-    constexpr auto and_then(F&& function) noexcept {
+    template<typename F> requires(requires(F function) {
+        std::invocable<F, T&>;
+    } && typing::is_specialisation_v<std::invoke_result_t<F, T&>, option>)
+    constexpr auto and_then(F&& function) noexcept(noexcept(function(value()))) {
         if (m_has_value) {
-            return std::forward<F>(function)(value());
+            return std::invoke(std::forward<F>(function), value());
         }
 
-        return nullopt;
+        return std::remove_cvref_t<std::invoke_result_t<F, T&>>{};
     }
 
     template<typename F> requires(requires(F function) {
+        std::invocable<F>;
         { function() } -> std::same_as<option<T>>;
     })
     constexpr auto or_else(F&& function)
@@ -119,6 +133,7 @@ public:
     }
 
     template<typename U, typename F> requires(requires(F function, T value) {
+        std::invocable<F, T>;
         { function(value) } -> std::constructible_from<option<U>, decltype(function())>;
     })
     constexpr auto map() -> option<U> {
@@ -130,9 +145,10 @@ public:
     }
 
     constexpr auto unwrap() noexcept(s_is_nothrow_move_constructible) -> T requires(s_is_move_constructible) {
-        auto value = std::move(m_data.value);
+        auto value = std::move(m_value);
         m_has_value = false;
-        m_data.dummy = detail::dummy();
+        m_value.~T();
+        m_dummy = {};
         return value;
     }
 
@@ -148,6 +164,7 @@ public:
     }
 
     template<typename F> requires(requires(F function) {
+        std::invocable<F>;
         { function() } -> std::constructible_from<T, decltype(function())>;
     })
     constexpr auto unwrap_or_else(F&& function)
@@ -160,14 +177,16 @@ public:
     }
 
 private:
-    union data {
-        std::remove_cv<T> value;
-        detail::dummy dummy;
+    union {
+        std::remove_cv_t<T> m_value;
+        detail::dummy m_dummy;
     };
 
-    data m_data;
     bool m_has_value;
 }; // class option
+
+template<typename T>
+option(T) -> option<T>;
 } // namespace rtl::utilities
 
 #endif // #ifndef RTL_OPTION_HPP

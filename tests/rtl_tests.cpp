@@ -3,8 +3,47 @@
 #include <print>
 #include <string>
 
+struct S {
+    S() noexcept {
+        std::println("Default");
+    }
+
+    S(int) noexcept {
+        std::println("Parameterised");
+    }
+
+    S(const S&) noexcept {
+        std::println("Copy");
+    }
+
+    S(S&&) noexcept {
+        std::println("Move");
+    }
+
+    S& operator=(const S&) noexcept {
+        std::println("Copy assign");
+        return *this;
+    }
+
+    S& operator=(S&&) noexcept {
+        std::println("Move assign");
+        return *this;
+    }
+};
+
 int main() {
-    rtl::collections::list<std::string> list;
+    // std::optional<S> s{{1}};
+    rtl::utilities::option<int> o = 100;
+    std::println("{}", o.has_value());
+
+    auto val = o.and_then([] (const int& i) {
+        return rtl::utilities::option<std::string>{std::to_string(i)};
+    }).and_then([] (std::string_view sv) {
+        return rtl::utilities::option<std::size_t>(sv.size());
+    }).unwrap_or(std::size_t{});
+
+    std::println("{}", val);
+    /*rtl::collections::list<std::string> list;
 
     for (auto i = 10; i < 20; i++) {
         list.add(std::to_string(i));
@@ -16,5 +55,5 @@ int main() {
         if (el.has_value()) {
             std::println("{} {}", i, el->get());
         }
-    }
+    }*/
 }
