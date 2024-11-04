@@ -22,6 +22,7 @@
 
 #include <functional>
 #include <type_traits>
+#include <utility>
 
 namespace rtl::utilities {
 namespace detail {
@@ -45,6 +46,8 @@ class option {
 private:
     static constexpr bool s_is_move_constructible = std::is_move_constructible_v<T>;
     static constexpr bool s_is_nothrow_move_constructible = std::is_nothrow_move_constructible_v<T>;
+    static constexpr bool s_is_copy_constructible = std::is_copy_constructible_v<T>;
+    static constexpr bool s_is_nothrow_copy_constructible = std::is_nothrow_copy_constructible_v<T>;
 
 public:
     constexpr option() noexcept
@@ -57,13 +60,29 @@ public:
         , m_has_value{false} {
     }
 
+    template<typename U> requires(std::is_constructible_v<T, const U&>)
+    constexpr explicit(std::is_convertible_v<const U&, T>) option(const option<U>& other)
+        noexcept(std::is_nothrow_constructible_v<T, U>)
+        : m_value{other.value()}
+        , m_has_value{true} {
+
+    }
+
+    template<typename U> requires(std::is_constructible_v<T, U>)
+    constexpr option(option<U>&& other)
+        noexcept(std::is_nothrow_constructible_v<T, U>)
+        : m_value{std::move(other.value())}
+        , m_has_value{true} {
+
+    }
+
     template<typename... Args>
-    constexpr option(Args&&... args) noexcept(noexcept(std::is_nothrow_constructible_v<T, Args...>))
+    constexpr option(std::in_place_t, Args&&... args) noexcept(noexcept(std::is_nothrow_constructible_v<T, Args...>))
         : m_value{std::forward<Args>(args)...}
         , m_has_value{true} {
     }
 
-    template<typename U = T>
+    template<typename U = T> requires(!typing::is_specialisation_v<std::remove_cvref_t<U>, option>)
     constexpr option(U&& value) noexcept(noexcept(std::is_nothrow_constructible_v<T, U>))
         : m_value{std::forward<U>(value)}
         , m_has_value{true} {
@@ -73,6 +92,85 @@ public:
         if (m_has_value) {
             m_value.~T();
         }
+    }
+
+    constexpr auto reset() noexcept -> void {
+        if (m_has_value) {
+            m_value.~T();
+            m_has_value = false;
+        }
+    }
+
+    constexpr auto operator=(nullopt_t) noexcept -> option& {
+        reset();
+    }
+
+    constexpr auto operator=(const option& other) noexcept(s_is_nothrow_copy_constructible)
+        -> option& requires(s_is_copy_constructible) {
+        if (this == &other) {
+            return *this;
+        }
+
+        if (m_has_value) {
+            if (other.has_value()) {
+                m_value = other.m_value;
+            } else {
+                reset();
+            }
+        } else if (other.has_value()) {
+            m_value = other.m_value;
+            m_has_value = true;
+        }
+
+        return *this;
+    }
+
+    constexpr auto operator=(option&& other) noexcept(s_is_nothrow_move_constructible)
+        -> option& requires(s_is_move_constructible) {
+        if (this == &other) {
+            return *this;
+        }
+
+        if (m_has_value) {
+            if (other.has_value()) {
+                m_value = std::move(other.m_value);
+            } else {
+                reset();
+            }
+        } else if (other.has_value()) {
+            m_value = std::move(other.m_value);
+            m_has_value = true;
+        }
+
+        return *this;
+    }
+
+    template<typename U = T>
+    requires(!typing::is_specialisation_v<std::remove_cvref_t<U>, option>
+        && std::is_constructible_v<T, U> && std::is_assignable_v<T&, U>)
+    constexpr auto operator=(U&& value)
+        noexcept(std::is_nothrow_constructible_v<T, U> && std::is_nothrow_assignable_v<T&, U>) -> option& {
+        m_value = std::forward<U>(value);
+        m_has_value = true;
+        return *this;
+    }
+
+    template<typename U>
+    requires(std::is_constructible_v<T, U> && std::is_assignable_v<T&, U>)
+    constexpr auto operator=(const option<U>& other)
+        noexcept(std::is_nothrow_constructible_v<T, U> && std::is_nothrow_assignable_v<T&, U>) -> option& {
+        m_value = other.value();
+        m_has_value = true;
+        return *this;
+    }
+
+    template<typename U>
+    requires(std::is_constructible_v<T, U> && std::is_assignable_v<T&, U>)
+    constexpr auto operator=(option<U>&& other)
+        noexcept(std::is_nothrow_constructible_v<T, U> && std::is_nothrow_assignable_v<T&, U>) -> option& {
+        m_value = std::move(other.value());
+        m_has_value = true;
+        return *this;
     }
 
     constexpr auto operator->() const noexcept -> const T* {
@@ -192,7 +290,8 @@ public:
     template<typename F>
     requires(std::invocable<F> && std::constructible_from<T, std::remove_cvref_t<std::invoke_result_t<F>>>)
     constexpr auto unwrap_or_else(F&& function)
-        noexcept(noexcept(std::invoke(std::forward<F>(function)))
+        noexcept(s_is_nothrow_move_constructible
+                 && noexcept(std::invoke(std::forward<F>(function)))
                  && std::is_nothrow_constructible_v<T, std::remove_cvref_t<std::invoke_result_t<F>>>)
         -> T {
         if (m_has_value) {

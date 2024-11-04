@@ -3,6 +3,8 @@
 #include <print>
 #include <string>
 
+using namespace rtl;
+
 struct S {
     S() noexcept {
         std::println("Default");
@@ -33,10 +35,9 @@ struct S {
 
 int main() {
     // std::optional<S> s{{1}};
-    rtl::utilities::option<std::string> o = "hello";
-    std::println("{}", o.has_value());
-
-    auto o1 = o.value_or("goodbye");
+    std::optional<const char*> o = "hello";
+    std::optional<std::string> s = o;
+    std::println("{}", *s);
 
    /* auto val = o.and_then([] (const int& i) {
         return rtl::utilities::option<std::string>{std::to_string(i)};
