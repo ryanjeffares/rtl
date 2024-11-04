@@ -20,6 +20,7 @@
 #ifndef RTL_OPTION_HPP
 #define RTL_OPTION_HPP
 
+#include <compare>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -60,8 +61,20 @@ public:
         , m_has_value{false} {
     }
 
+    constexpr option(const option& other) noexcept(s_is_nothrow_copy_constructible) requires(s_is_copy_constructible)
+        : m_value{other.value()}
+        , m_has_value{true} {
+
+    }
+
+    constexpr option(option&& other) noexcept(s_is_nothrow_move_constructible) requires(s_is_move_constructible)
+        : m_value{std::move(other.value())}
+        , m_has_value{true} {
+
+    }
+
     template<typename U> requires(std::is_constructible_v<T, const U&>)
-    constexpr explicit(std::is_convertible_v<const U&, T>) option(const option<U>& other)
+    constexpr explicit(!std::is_convertible_v<const U&, T>) option(const option<U>& other)
         noexcept(std::is_nothrow_constructible_v<T, U>)
         : m_value{other.value()}
         , m_has_value{true} {
@@ -189,7 +202,7 @@ public:
         return value();
     }
 
-    constexpr auto value() const noexcept -> T& {
+    constexpr auto value() const noexcept -> const T& {
         return m_value;
     }
 

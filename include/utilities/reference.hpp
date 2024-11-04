@@ -35,24 +35,24 @@ public:
     constexpr reference(const reference&) noexcept = default;
     constexpr auto operator=(const reference&) noexcept -> reference& = default;
 
-    constexpr auto operator==(reference other) const noexcept(noexcept(get() == other.get())) -> bool {
-        return get() == other.get();
-    }
-
-    constexpr auto operator==(reference<const T> other) const noexcept(noexcept(get() == other.get())) -> bool {
-        return get() == other.get();
-    }
-
-    constexpr auto operator==(const T& other) const noexcept(noexcept(get() == other)) -> bool {
-        return get() == other;
-    }
-
     constexpr explicit operator T&() const noexcept {
         return *m_ptr;
     }
 
     constexpr auto get() const noexcept -> T& {
         return *m_ptr;
+    }
+
+    constexpr auto operator==(reference other) const -> bool {
+        return get() == other.get();
+    }
+
+    constexpr auto operator==(reference<const T> other) const -> bool requires(!std::is_const_v<T>) {
+        return get() == other.get();
+    }
+
+    constexpr auto operator==(const T& other) const -> bool {
+        return get() == other;
     }
 
     template<typename... Args> requires(std::invocable<T, Args...>)

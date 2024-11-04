@@ -21,6 +21,7 @@
 #define RTL_LIST_HPP
 
 #include "typing/concepts.hpp"
+#include "utilities/option.hpp"
 #include "utilities/reference.hpp"
 
 #include <algorithm>
@@ -69,22 +70,61 @@ public:
     }
 
     // access
-    constexpr auto operator[](size_type index) const noexcept -> std::optional<utilities::reference<const T>> {
+    constexpr auto operator[](size_type index) const noexcept -> const T& {
+        return m_array[index];
+    }
+
+    constexpr auto operator[](size_type index) noexcept -> T& {
+        return m_array[index];
+    }
+
+    constexpr auto at(size_type index) const noexcept -> utilities::option<utilities::reference<const T>> {
         if (index < m_size) {
             return m_array[index];
         }
 
-        return std::nullopt;
+        return utilities::nullopt;
     }
 
-    constexpr auto operator[](size_type index) noexcept -> std::optional<utilities::reference<T>> {
+    constexpr auto at(size_type index) noexcept -> utilities::option<utilities::reference<T>> {
         if (index < m_size) {
             return m_array[index];
         }
 
-        return std::nullopt;
+        return utilities::nullopt;
     }
 
+    constexpr auto front() const noexcept -> utilities::option<utilities::reference<const T>> {
+        if (empty()) {
+            return utilities::nullopt;
+        }
+
+        return at(0);
+    }
+
+    constexpr auto front() noexcept -> utilities::option<utilities::reference<T>> {
+        if (empty()) {
+            return utilities::nullopt;
+        }
+
+        return at(0);
+    }
+
+    constexpr auto back() const noexcept -> utilities::option<utilities::reference<const T>> {
+        if (empty()) {
+            return utilities::nullopt;
+        }
+
+        return at(m_size - 1);
+    }
+
+    constexpr auto back() noexcept -> utilities::option<utilities::reference<T>> {
+        if (empty()) {
+            return utilities::nullopt;
+        }
+
+        return at(m_size - 1);
+    }
     // iterators
 
     // capacity/size queries

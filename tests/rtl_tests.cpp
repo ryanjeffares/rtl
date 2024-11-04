@@ -34,29 +34,19 @@ struct S {
 };
 
 int main() {
-    // std::optional<S> s{{1}};
-    std::optional<const char*> o = "hello";
-    std::optional<std::string> s = o;
-    std::println("{}", *s);
-
-   /* auto val = o.and_then([] (const int& i) {
-        return rtl::utilities::option<std::string>{std::to_string(i)};
-    }).and_then([] (std::string_view sv) {
-        return rtl::utilities::option<std::size_t>(sv.size());
-    }).unwrap_or(std::size_t{});*/
-
-    // std::println("{}", val);
-    /*rtl::collections::list<std::string> list;
+    rtl::collections::list<std::string> list;
 
     for (auto i = 10; i < 20; i++) {
         list.add(std::to_string(i));
     }
 
-    for (std::size_t i = 0; i < 15; i++) {
-        auto el = list[i];
+    const rtl::collections::list<std::string> l2;
 
-        if (el.has_value()) {
-            std::println("{} {}", i, el->get());
+    for (std::size_t i = 0; i < 15; i++) {
+        auto el = list.at(i);
+
+        if (el) {
+            std::println("{}", el->get());
         }
-    }*/
+    }
 }
