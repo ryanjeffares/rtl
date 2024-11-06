@@ -24,6 +24,7 @@
 #include "typing/concepts.hpp"
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -98,6 +99,13 @@ public:
         , m_has_value{true} {
     }
 
+    template<typename U, typename... Args> requires(std::is_constructible_v<T, std::initializer_list<U>&, Args...>)
+    constexpr option(std::in_place_t, std::initializer_list<U> ilist, Args&&... args)
+        noexcept(noexcept(std::is_nothrow_constructible_v<T, std::initializer_list<U>&, Args...>))
+        : m_value{ilist, std::forward<Args>(args)...}
+        , m_has_value{true} {
+    }
+        
     template<typename U = T> requires(!typing::is_specialisation_v<std::remove_cvref_t<U>, option>)
     constexpr option(U&& value) noexcept(noexcept(std::is_nothrow_constructible_v<T, U>))
         : m_value{std::forward<U>(value)}

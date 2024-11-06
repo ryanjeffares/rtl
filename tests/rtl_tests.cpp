@@ -36,6 +36,5 @@ struct S {
 };
 
 int main() {
-    const utilities::option<S> o = 10;
-    o->foo();
+    const utilities::option<std::string> o{std::in_place, {'a', 'b', 'c'}};
 }
