@@ -57,6 +57,9 @@ public:
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
 
+    using optional_ref = utilities::option<utilities::reference<T>>;
+    using optional_const_ref = utilities::option<utilities::reference<const T>>;
+
     // construction
 
     constexpr list() noexcept(noexcept(allocator_type{})) = default;
@@ -71,17 +74,15 @@ public:
     }
 
     // access
-    constexpr auto operator[](size_type index) const noexcept -> const T& {
-        RTL_ASSERT(index < m_size, std::format("Index out of range: the index is {} but the size is {}", index, m_size));
-        return m_array[index];
+    constexpr auto operator[](size_type index) const noexcept -> optional_const_ref {
+        return at(index);
     }
 
-    constexpr auto operator[](size_type index) noexcept -> T& {
-        RTL_ASSERT(index < m_size, std::format("Index out of range: the index is {} but the size is {}", index, m_size));
-        return m_array[index];
+    constexpr auto operator[](size_type index) noexcept -> optional_ref {
+        return at(index);
     }
 
-    constexpr auto at(size_type index) const noexcept -> utilities::option<utilities::reference<const T>> {
+    constexpr auto at(size_type index) const noexcept -> optional_const_ref {
         if (index < m_size) {
             return m_array[index];
         }
@@ -89,7 +90,7 @@ public:
         return utilities::nullopt;
     }
 
-    constexpr auto at(size_type index) noexcept -> utilities::option<utilities::reference<T>> {
+    constexpr auto at(size_type index) noexcept -> optional_ref {
         if (index < m_size) {
             return m_array[index];
         }
@@ -97,7 +98,19 @@ public:
         return utilities::nullopt;
     }
 
-    constexpr auto front() const noexcept -> utilities::option<utilities::reference<const T>> {
+    constexpr auto at_unchecked(size_type index) const noexcept -> const T& {
+        RTL_ASSERT(index < m_size,
+                std::format("Index out of range: the index is {} but the size is {}", index, m_size));
+        return m_array[index];
+    }
+
+    constexpr auto at_unchecked(size_type index) noexcept -> T& {
+        RTL_ASSERT(index < m_size,
+                std::format("Index out of range: the index is {} but the size is {}", index, m_size));
+        return m_array[index];
+    }
+
+    constexpr auto front() const noexcept -> optional_const_ref {
         if (empty()) {
             return utilities::nullopt;
         }
@@ -105,7 +118,7 @@ public:
         return at(0);
     }
 
-    constexpr auto front() noexcept -> utilities::option<utilities::reference<T>> {
+    constexpr auto front() noexcept -> optional_ref {
         if (empty()) {
             return utilities::nullopt;
         }
@@ -113,7 +126,7 @@ public:
         return at(0);
     }
 
-    constexpr auto back() const noexcept -> utilities::option<utilities::reference<const T>> {
+    constexpr auto back() const noexcept -> optional_const_ref {
         if (empty()) {
             return utilities::nullopt;
         }
@@ -121,7 +134,7 @@ public:
         return at(m_size - 1);
     }
 
-    constexpr auto back() noexcept -> utilities::option<utilities::reference<T>> {
+    constexpr auto back() noexcept -> optional_ref {
         if (empty()) {
             return utilities::nullopt;
         }
@@ -145,11 +158,12 @@ public:
     }
 
     constexpr auto reserve(size_type capacity) noexcept(s_is_nothrow_move_constructible)
-    -> void requires(s_is_move_constructible) {
+        -> void requires(s_is_move_constructible) {
         if (capacity <= m_capacity) {
             return;
         }
 
+        std::println("Reserving {}", capacity);
         auto array = m_allocator.allocate(capacity);
 
         for (size_type i = 0; i < m_size; i++) {
@@ -164,7 +178,7 @@ public:
     }
 
     constexpr auto shrink_to_fit() noexcept(s_is_nothrow_move_constructible)
-    -> void requires(s_is_move_constructible) {
+        -> void requires(s_is_move_constructible) {
         if (m_size == m_capacity) {
             return;
         }
@@ -187,29 +201,113 @@ public:
     // clear, remove, insert, pop
 
     constexpr auto add(const T& value) noexcept(s_is_nothrow_copy_constructible && s_is_nothrow_move_constructible)
-    -> void requires(s_is_copy_constructible) {
+        -> void requires(s_is_copy_constructible && s_is_move_constructible) {
         grow_if_needed();
         allocator_traits::construct(m_allocator, m_array + m_size, value);
         m_size++;
     }
 
     constexpr auto add(T&& value) noexcept(s_is_nothrow_move_constructible)
-    -> void requires(s_is_move_constructible) {
+        -> void requires(s_is_move_constructible) {
         grow_if_needed();
         allocator_traits::construct(m_allocator, m_array + m_size, std::move(value));
         m_size++;
     }
 
-    template<typename... Args>
-    constexpr auto add(Args&& ... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
-    -> void requires(std::constructible_from<T, Args...>) {
+    template<typename... Args> requires(std::constructible_from<T, Args...>)
+    constexpr auto add(Args&& ... args) noexcept(std::is_nothrow_constructible_v<T, Args...>) -> void {
         grow_if_needed();
         allocator_traits::construct(m_allocator, m_array + m_size, std::forward<Args>(args)...);
         m_size++;
     }
 
-    constexpr auto resize(size_type size) noexcept(s_is_nothrow_default_constructible && s_is_nothrow_move_constructible)
-    -> void requires(s_is_default_constructible) {
+    constexpr auto insert(size_type index, const T& value)
+        noexcept(s_is_nothrow_copy_constructible && s_is_nothrow_move_constructible)
+        -> optional_ref requires(s_is_copy_constructible && s_is_move_constructible) {
+        if (index >= m_size) {
+            return utilities::nullopt;
+        }
+
+        grow_if_needed();
+
+        for (size_type i = m_size; i > index; i--) {
+            allocator_traits::construct(m_allocator, m_array + i, std::move(m_array[i - 1]));
+        }
+        
+        allocator_traits::construct(m_allocator, m_array + index, value);
+        m_size++;
+        return at_unchecked(index);
+    }
+
+    constexpr auto insert(size_type index, size_type count, const T& value)
+        noexcept(s_is_nothrow_copy_constructible && s_is_nothrow_move_constructible)
+        -> optional_ref requires(s_is_copy_constructible && s_is_move_constructible) {
+        if (index >= m_size && count == 0) {
+            return utilities::nullopt;
+        }
+
+        grow_if_needed(count);
+
+        std::println("{}", index);
+        for (size_type i = m_size + count - 1; i > index; i--) {
+            std::println("Moving {} to {}", i - count, i);
+            allocator_traits::construct(m_allocator, m_array + i, std::move(m_array[i - count]));
+        }
+        
+        for (size_type i = 0; i < count; i++) {
+            std::println("Construction at {}", index + i);
+            allocator_traits::construct(m_allocator, m_array + index + i, value);
+        }
+
+        m_size += count;
+        return at_unchecked(index);
+    }
+
+    constexpr auto insert(size_type index, T&& value) noexcept(s_is_nothrow_move_constructible)
+        -> optional_ref requires(s_is_move_constructible) {
+        if (index >= m_size) {
+            return utilities::nullopt;
+        }
+
+        grow_if_needed();
+
+        for (size_type i = m_size; i > index; i--) {
+            allocator_traits::construct(m_allocator, m_array + i, std::move(m_array[i - 1]));
+        }
+        
+        allocator_traits::construct(m_allocator, m_array + index, std::move(value));
+        m_size++;
+        return at_unchecked(index);
+    }
+
+    template<typename... Args> requires(std::constructible_from<T, Args...>)
+    constexpr auto insert(size_type index, Args&&...  args)
+        noexcept(s_is_nothrow_move_constructible && std::is_nothrow_constructible_v<T, Args...>)
+        -> optional_ref requires(s_is_move_constructible) {
+        if (index >= m_size) {
+            return utilities::nullopt;
+        }
+
+        grow_if_needed();
+
+        for (size_type i = m_size; i > index; i--) {
+            allocator_traits::construct(m_allocator, m_array + i, std::move(m_array[i - 1]));
+        }
+        
+        allocator_traits::construct(m_allocator, m_array + index, std::forward<Args>(args)...);
+        m_size++;
+        return at_unchecked(index);
+    }
+
+    constexpr auto pop() noexcept(s_is_nothrow_move_constructible) -> T requires(s_is_move_constructible) {
+        auto value = std::move(back());
+        resize(m_size - 1);
+        return value;
+    }
+
+    constexpr auto resize(size_type size)
+        noexcept(s_is_nothrow_default_constructible && s_is_nothrow_move_constructible)
+        -> void requires(s_is_default_constructible) {
         if (size < m_size) {
             for (auto i = size; i < m_size; i++) {
                 allocator_traits::destroy(m_allocator, m_array + i);
@@ -225,7 +323,7 @@ public:
     }
 
     constexpr auto resize(size_type size, const T& value) noexcept(s_is_nothrow_copy_constructible)
-    -> void requires(s_is_copy_constructible) {
+        -> void requires(s_is_copy_constructible) {
         if (size < m_size) {
             for (auto i = size; i < m_size; i++) {
                 allocator_traits::destroy(m_allocator, m_array + i);
@@ -240,8 +338,17 @@ public:
         m_size = size;
     }
 
+    constexpr auto clear() noexcept -> void {
+        for (size_type i = 0; i < m_size; i++) {
+            allocator_traits::destroy(m_allocator, m_array + i);
+        }
+
+        m_size = 0;
+    }
+
 private:
-    constexpr auto grow_if_needed(size_type increase = 1) noexcept(noexcept(reserve(0))) {
+    constexpr auto grow_if_needed(size_type increase = 1) noexcept(noexcept(reserve(0)))
+        -> void requires(s_is_move_constructible) {
         if (empty() || m_size == m_capacity || m_capacity - m_size < increase) {
             reserve(std::max(m_capacity == 0 ? 1 : m_capacity * 2, m_size + increase));
         }

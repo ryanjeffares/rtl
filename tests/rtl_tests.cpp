@@ -36,5 +36,25 @@ struct S {
 };
 
 int main() {
-    const utilities::option<std::string> o{std::in_place, {'a', 'b', 'c'}};
+    collections::list<std::string> strings;
+
+    auto print_all = [&strings] {
+        for (std::size_t i = 0; i < strings.size(); i++) {
+            std::println("{}", strings[i]->get());
+        }
+        std::println("===");
+    };
+
+    strings.add("Ryan1");
+    strings.add("Ryan2");
+    strings.add("Ryan3");
+    strings.add("Ryan4");
+    strings.add("Ryan5");
+    print_all();
+    strings.insert(0, "Ryan6");
+    print_all();
+    strings.insert(5, "Ryan7");
+    print_all();
+    strings.insert(2, 4, "Ryan8");
+    print_all();
 }
