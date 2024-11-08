@@ -29,6 +29,7 @@
 #include <concepts>
 #include <cstddef>
 #include <format>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <type_traits>
@@ -96,6 +97,17 @@ public:
         : m_allocator{allocator} {
         for (auto it = first; it != last; ++it) {
             add(*it);
+        }
+    }
+
+    constexpr list(std::initializer_list<T> ilist, const Allocator& allocator = Allocator{})
+        noexcept(noexcept(Allocator{allocator})
+                 && std::is_nothrow_constructible_v<T, typename decltype(ilist)::reference>)
+        requires(std::constructible_from<T, typename decltype(ilist)::reference>)
+        : m_allocator{allocator} {
+        reserve(ilist.size());
+        for (auto& el : ilist) {
+            add(el);
         }
     }
 
@@ -198,15 +210,18 @@ public:
         using reference = value_type&;
         using difference_type = difference_type;
 
-        constexpr raw_iterator(pointer p) : m_pointer{p} {
+        constexpr raw_iterator() noexcept = default;
+        constexpr raw_iterator(pointer p) noexcept : m_pointer{p} {
 
         }
 
-        constexpr auto operator*() const noexcept -> Ty& {
+        constexpr raw_iterator(const raw_iterator&) noexcept = default;
+
+        constexpr auto operator*() const noexcept -> reference {
             return *m_pointer;
         }
 
-        constexpr auto operator->() const noexcept -> Ty* {
+        constexpr auto operator->() const noexcept -> pointer {
             return m_pointer;
         }
 
@@ -237,8 +252,12 @@ public:
             return *this;
         }
 
-        constexpr auto operator+(difference_type n) const noexcept -> raw_iterator {
-            return m_pointer + n;
+        constexpr friend auto operator+(const raw_iterator& it, difference_type n) noexcept -> raw_iterator {
+            return it.m_pointer + n;
+        }
+
+        constexpr friend auto operator+(difference_type n, const raw_iterator& it) noexcept -> raw_iterator {
+            return n + it.m_pointer;
         }
 
         constexpr auto operator-=(difference_type n) noexcept -> raw_iterator& {
@@ -246,12 +265,16 @@ public:
             return *this;
         }
 
-        constexpr auto operator-(difference_type n) const noexcept -> raw_iterator {
-            return m_pointer - n;
+        constexpr friend auto operator-(const raw_iterator& it, difference_type n) noexcept -> raw_iterator {
+            return it.m_pointer - n;
         }
 
-        constexpr auto operator-(const raw_iterator& other) const noexcept -> difference_type {
-            return m_pointer - other.m_pointer;
+        constexpr friend auto operator-(difference_type n, const raw_iterator& it) noexcept -> raw_iterator {
+            return n - it.m_pointer;
+        }
+
+        constexpr friend auto operator-(const raw_iterator& a, const raw_iterator& b) noexcept -> difference_type {
+            return a.m_pointer - b.m_pointer;
         }
 
         constexpr auto operator[](difference_type n) const noexcept -> Ty& {
@@ -283,11 +306,14 @@ public:
         }
 
     private:
-        pointer m_pointer;
+        pointer m_pointer{nullptr};
     }; // class raw_iterator
 
     using iterator = raw_iterator<value_type>;
     using const_iterator = raw_iterator<const value_type>;
+
+    static_assert(typing::legacy_random_access_iterator<iterator>);
+    static_assert(typing::legacy_random_access_iterator<const_iterator>);
 
     constexpr auto begin() noexcept -> iterator {
         if (empty()) {
@@ -517,6 +543,12 @@ private:
     size_type m_capacity{};
     allocator_type m_allocator{};
 }; // class list
+
+template<
+    typing::legacy_input_iterator It,
+    typing::simple_allocator Alloc = typename std::allocator<typename std::iterator_traits<It>::value_type>
+>
+list(It, It, Alloc = Alloc{}) -> list<typename std::iterator_traits<It>::value_type, Alloc>;
 } // namespace rtl::collections
 
 #endif // #ifndef RTL_LIST_HPP

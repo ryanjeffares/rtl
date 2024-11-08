@@ -43,14 +43,17 @@ inline constexpr bool is_specialisation_v = false;
 template<template<typename...> typename Template, typename... Ts>
 inline constexpr bool is_specialisation_v<Template<Ts...>, Template> = true;
 
-template<typename T, typename>
+template<typename T>
 concept is_not = !std::is_same_v<T, void>;
+
+template<typename T>
+concept referencable = is_not<T>;
 
 template<typename It>
 concept legacy_iterator = requires(It it) {
-    { *it } -> is_not<void>;
+    { *it } -> referencable;
     { ++it } -> std::same_as<It&>;
-    { *it++ } -> is_not<void>;
+    { *it++ } -> referencable;
 } && std::copyable<It>;
 
 template<typename It>
@@ -63,6 +66,32 @@ concept legacy_input_iterator = requires(It it) {
     typename std::common_reference_t<decltype(*it++)&&, typename std::indirectly_readable_traits<It>::value_type&>;
     requires std::signed_integral<typename std::incrementable_traits<It>::difference_type>;
 } && std::equality_comparable<It> && legacy_iterator<It>;
+
+template<typename It>
+concept legacy_forward_iterator = requires(It it) {
+    { it++ } -> std::convertible_to<const It&>;
+    { *it++ } -> std::same_as<std::iter_reference_t<It>>;
+} && legacy_input_iterator<It> && std::constructible_from<It> && std::is_reference_v<std::iter_reference_t<It>>
+    && std::same_as<std::remove_cvref_t<std::iter_reference_t<It>>,
+        typename std::indirectly_readable_traits<It>::value_type>;
+
+template<typename It>
+concept legacy_bidirectional_iterator = requires(It it) {
+    { --it } -> std::same_as<It&>;
+    { it-- } -> std::convertible_to<const It&>;
+    { *it-- } -> std::same_as<std::iter_reference_t<It>>;
+} && legacy_forward_iterator<It>;
+
+template<typename It>
+concept legacy_random_access_iterator = requires(It it, typename std::incrementable_traits<It>::difference_type n) {
+    { it += n } -> std::same_as<It&>;
+    { it -= n } -> std::same_as<It&>;
+    { it + n } -> std::same_as<It>;
+    { n + it } -> std::same_as<It>;
+    { it - n } -> std::same_as<It>;
+    { it - it } -> std::same_as<decltype(n)>;
+    { it[n] } -> std::convertible_to<std::iter_reference_t<It>>;
+} && legacy_bidirectional_iterator<It> && std::totally_ordered<It>;
 } // namespace rtl::typing
 
 #endif // #ifndef RTL_CONCEPTS_HPP

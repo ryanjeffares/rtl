@@ -2,6 +2,7 @@
 
 #include <print>
 #include <string>
+#include <vector>
 
 using namespace rtl;
 
@@ -60,4 +61,7 @@ int main() {
     for (auto it = strings.cbegin(); it != const_strings.cend(); ++it) {
         std::println("{}, {}", *it, it->size());
     }
+
+    std::vector<int> v;
+    auto it = typename decltype(v)::iterator{};
 }
