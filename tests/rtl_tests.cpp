@@ -39,8 +39,8 @@ int main() {
     collections::list<std::string> strings;
 
     auto print_all = [&strings] {
-        for (std::size_t i = 0; i < strings.size(); i++) {
-            std::println("{}", strings[i]->get());
+        for (const auto& string : strings) {
+            std::println("{}", string);
         }
         std::println("===");
     };
@@ -55,6 +55,8 @@ int main() {
     print_all();
     strings.insert(5, "Ryan7");
     print_all();
-    strings.insert(2, 4, "Ryan8");
-    print_all();
+
+    for (auto it = strings.begin(); it != strings.end(); ++it) {
+        std::println("{}, {}", *it, it->size());
+    }
 }

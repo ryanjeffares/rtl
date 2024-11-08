@@ -29,6 +29,7 @@
 #include <concepts>
 #include <cstddef>
 #include <format>
+#include <iterator>
 #include <memory>
 #include <type_traits>
 
@@ -126,6 +127,14 @@ public:
         return at(0);
     }
 
+    constexpr auto front_unchecked() const noexcept -> const T& {
+        return at_unchecked(0);
+    }
+
+    constexpr auto front_unchecked() noexcept -> T& {
+        return at_unchecked(0);
+    }
+
     constexpr auto back() const noexcept -> optional_const_ref {
         if (empty()) {
             return utilities::nullopt;
@@ -141,7 +150,151 @@ public:
 
         return at(m_size - 1);
     }
+
+    constexpr auto back_unchecked() const noexcept -> const T& {
+        return at_unchecked(m_size - 1);
+    }
+
+    constexpr auto back_unchecked() noexcept -> T& {
+        return at_unchecked(m_size - 1);
+    }
+
     // iterators
+    template<typename Ty>
+    class raw_iterator {
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = Ty;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using difference_type = difference_type;
+
+        constexpr raw_iterator(pointer p) : m_pointer{p} {
+
+        }
+
+        constexpr auto operator*() const noexcept -> Ty& {
+            return *m_pointer;
+        }
+
+        constexpr auto operator->() const noexcept -> Ty* {
+            return m_pointer;
+        }
+
+        constexpr auto operator++() noexcept -> raw_iterator& {
+            ++m_pointer;
+            return *this;
+        }
+
+        constexpr auto operator++(int) noexcept -> raw_iterator {
+            auto temp = *this;
+            ++(*this);
+            return temp;
+        }
+
+        constexpr auto operator--() noexcept -> raw_iterator& {
+            --m_pointer;
+            return *this;
+        }
+
+        constexpr auto operator--(int) noexcept -> raw_iterator {
+            auto temp = *this;
+            --(*this);
+            return temp;
+        }
+
+        constexpr auto operator+=(difference_type n) noexcept -> raw_iterator& {
+            m_pointer += n;
+            return *this;
+        }
+
+        constexpr auto operator+(difference_type n) const noexcept -> raw_iterator {
+            return m_pointer + n;
+        }
+
+        constexpr auto operator-=(difference_type n) noexcept -> raw_iterator& {
+            m_pointer -= n;
+            return *this;
+        }
+
+        constexpr auto operator-(difference_type n) const noexcept -> raw_iterator {
+            return m_pointer - n;
+        }
+
+        constexpr auto operator-(const raw_iterator& other) const noexcept -> difference_type {
+            return m_pointer - other.m_pointer;
+        }
+
+        constexpr auto operator[](difference_type n) const noexcept -> Ty& {
+            return *(*this + n);
+        }
+
+        constexpr friend auto operator<(const raw_iterator& a, const raw_iterator& b) noexcept -> bool {
+            return b - a > 0;
+        }
+
+        constexpr friend auto operator>(const raw_iterator& a, const raw_iterator& b) noexcept -> bool {
+            return b < a;
+        }
+
+        constexpr friend auto operator<=(const raw_iterator& a, const raw_iterator& b) noexcept -> bool {
+            return !(a < b);
+        }
+
+        constexpr friend auto operator>=(const raw_iterator& a, const raw_iterator& b) noexcept -> bool {
+            return !(a > b);
+        }
+
+        constexpr friend auto operator==(const raw_iterator& a, const raw_iterator& b) noexcept -> bool {
+            return a.m_pointer == b.m_pointer;
+        }
+
+        constexpr friend auto operator!=(const raw_iterator& a, const raw_iterator& b) noexcept -> bool {
+            return a.m_pointer != b.m_pointer;
+        }
+
+    private:
+        pointer m_pointer;
+    }; // class raw_iterator
+
+    using iterator = raw_iterator<value_type>;
+    using const_iterator = raw_iterator<const value_type>;
+
+    constexpr auto begin() noexcept -> iterator {
+        if (empty()) {
+            return end();
+        }
+
+        return m_array;
+    }
+
+    constexpr auto begin() const noexcept -> const_iterator {
+        if (empty()) {
+            return end();
+        }
+
+        return m_array;
+    }
+
+    constexpr auto cbegin() const noexcept -> const_iterator {
+        if (empty()) {
+            return cend();
+        }
+
+        return m_array;
+    }
+
+    constexpr auto end() noexcept -> iterator {
+        return m_array + m_size;
+    }
+
+    constexpr auto end() const noexcept -> const_iterator {
+        return m_array + m_size;
+    }
+
+    constexpr auto cend() const noexcept -> const_iterator {
+        return m_array + m_size;
+    }
 
     // capacity/size queries
 
@@ -236,30 +389,6 @@ public:
         
         allocator_traits::construct(m_allocator, m_array + index, value);
         m_size++;
-        return at_unchecked(index);
-    }
-
-    constexpr auto insert(size_type index, size_type count, const T& value)
-        noexcept(s_is_nothrow_copy_constructible && s_is_nothrow_move_constructible)
-        -> optional_ref requires(s_is_copy_constructible && s_is_move_constructible) {
-        if (index >= m_size && count == 0) {
-            return utilities::nullopt;
-        }
-
-        grow_if_needed(count);
-
-        std::println("{}", index);
-        for (size_type i = m_size + count - 1; i > index; i--) {
-            std::println("Moving {} to {}", i - count, i);
-            allocator_traits::construct(m_allocator, m_array + i, std::move(m_array[i - count]));
-        }
-        
-        for (size_type i = 0; i < count; i++) {
-            std::println("Construction at {}", index + i);
-            allocator_traits::construct(m_allocator, m_array + index + i, value);
-        }
-
-        m_size += count;
         return at_unchecked(index);
     }
 
