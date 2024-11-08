@@ -22,6 +22,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <iterator>
 #include <type_traits>
 
 namespace rtl::typing
@@ -41,6 +42,27 @@ inline constexpr bool is_specialisation_v = false;
 
 template<template<typename...> typename Template, typename... Ts>
 inline constexpr bool is_specialisation_v<Template<Ts...>, Template> = true;
+
+template<typename T, typename>
+concept is_not = !std::is_same_v<T, void>;
+
+template<typename It>
+concept legacy_iterator = requires(It it) {
+    { *it } -> is_not<void>;
+    { ++it } -> std::same_as<It&>;
+    { *it++ } -> is_not<void>;
+} && std::copyable<It>;
+
+template<typename It>
+concept legacy_input_iterator = requires(It it) {
+    typename std::incrementable_traits<It>::difference_type;
+    typename std::indirectly_readable_traits<It>::value_type;
+    typename std::common_reference_t<std::iter_reference_t<It>&&,
+        typename std::indirectly_readable_traits<It>::value_type&>;
+    *it++;
+    typename std::common_reference_t<decltype(*it++)&&, typename std::indirectly_readable_traits<It>::value_type&>;
+    requires std::signed_integral<typename std::incrementable_traits<It>::difference_type>;
+} && std::equality_comparable<It> && legacy_iterator<It>;
 } // namespace rtl::typing
 
 #endif // #ifndef RTL_CONCEPTS_HPP

@@ -63,11 +63,40 @@ public:
 
     // construction
 
-    constexpr list() noexcept(noexcept(allocator_type{})) = default;
+    constexpr list() noexcept(noexcept(Allocator{})) = default;
 
-    explicit constexpr list(const allocator_type& allocator) noexcept(noexcept(allocator_type{allocator}))
+    explicit constexpr list(const Allocator& allocator) noexcept(noexcept(Allocator{allocator}))
         : m_allocator{allocator} {
 
+    }
+
+    explicit constexpr list(size_type count, const Allocator& allocator = Allocator{})
+        noexcept(s_is_nothrow_default_constructible && noexcept(noexcept(Allocator{allocator})))
+        : m_allocator{allocator} {
+        reserve(count);
+        for (size_type i = 0; i < count; i++) {
+            add(T{});
+        }
+    }
+
+    constexpr list(size_type count, const T& value, const Allocator& allocator = Allocator{})
+        noexcept(s_is_nothrow_copy_constructible && noexcept(noexcept(Allocator{allocator})))
+            requires(s_is_copy_constructible)
+        : m_allocator{allocator} {
+        reserve(count);
+        for (size_type i = 0; i < count; i++) {
+            add(value);
+        }
+    }
+
+    template<typing::legacy_input_iterator It>
+    constexpr list(It first, It last, const Allocator& allocator = Allocator{})
+        noexcept(noexcept(Allocator{allocator}) && std::is_nothrow_constructible_v<T, decltype(*first)>)
+        requires(std::constructible_from<T, decltype(*first)>)
+        : m_allocator{allocator} {
+        for (auto it = first; it != last; ++it) {
+            add(*it);
+        }
     }
 
     constexpr auto get_allocator() const noexcept(noexcept(allocator_type{m_allocator})) {

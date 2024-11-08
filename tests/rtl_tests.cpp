@@ -56,7 +56,8 @@ int main() {
     strings.insert(5, "Ryan7");
     print_all();
 
-    for (auto it = strings.begin(); it != strings.end(); ++it) {
+    const collections::list<std::string> const_strings;
+    for (auto it = strings.cbegin(); it != const_strings.cend(); ++it) {
         std::println("{}, {}", *it, it->size());
     }
 }
